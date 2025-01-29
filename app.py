@@ -2,21 +2,35 @@ import numpy as np
 from fastapi import FastAPI, HTTPException
 
 
-from constants import IndexType, MetricType, Dim
+from constants import IndexType, MetricType, DIM, NUM_DATA
 from schemas import SearchRequest, SearchResponse, InsertRequest, InsertResponse
 from indexes.index_factory import IndexFactory
 
-app = FastAPI()
+app = FastAPI(debug=True)
+
+"""
+初始化索引
+"""
 
 index_factory = IndexFactory()
-index_factory.init(IndexType.FLAT, Dim)
+index_factory.init(IndexType.FLAT, DIM)
+index_factory.init(IndexType.HNSW, DIM, NUM_DATA)
+
+
+"""
+注册接口
+"""
 
 @app.post("/search", response_model=SearchResponse)
 async def search(request: SearchRequest):
     try:
-        index_type = IndexType.FLAT if request.index_type == "FLAT" else IndexType.UNKNOWN
-        if index_type == IndexType.UNKNOWN:
-            raise HTTPException(status_code=400, detail="Invalid index type")
+        match request.index_type:
+            case IndexType.FLAT.value:
+                index_type = IndexType.FLAT
+            case IndexType.HNSW.value:
+                index_type = IndexType.HNSW
+            case _:
+                raise HTTPException(status_code=400, detail="Invalid index type")
 
         index = index_factory.get_index(index_type)
         if not index:
@@ -37,9 +51,13 @@ async def search(request: SearchRequest):
 @app.post("/insert", response_model=InsertResponse)
 async def insert(request: InsertRequest):
     try:
-        index_type = IndexType.FLAT if request.index_type == "FLAT" else IndexType.UNKNOWN
-        if index_type == IndexType.UNKNOWN:
-            raise HTTPException(status_code=400, detail="Invalid index type")
+        match request.index_type:
+            case IndexType.FLAT.value:
+                index_type = IndexType.FLAT
+            case IndexType.HNSW.value:
+                index_type = IndexType.HNSW
+            case _:
+                raise HTTPException(status_code=400, detail="Invalid index type")
 
         index = index_factory.get_index(index_type)
         if not index:

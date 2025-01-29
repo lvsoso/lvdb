@@ -1,17 +1,18 @@
 from pydantic import BaseModel
 from typing import List, Optional
+from constants import IndexType
 
 
 class SearchRequest(BaseModel):
     vectors: List[float]
     k: int
-    index_type: str = "FLAT"
+    index_type: str = IndexType.FLAT
 
 
 class InsertRequest(BaseModel):
     vectors: List[float]
     id: int
-    index_type: str = "FLAT"
+    index_type: str = IndexType.FLAT
 
 
 class SearchResponse(BaseModel):

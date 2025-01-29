@@ -1,3 +1,5 @@
+## FLAT 索引
+
 ### 插入向量
 POST http://localhost:8000/insert
 Content-Type: application/json
@@ -37,4 +39,38 @@ Content-Type: application/json
     "vectors": [0.5], 
     "k": 5, 
     "index_type": "FLAT"
+}
+
+
+## HNSW 索引
+
+### 插入向量
+POST http://localhost:8000/insert
+Content-Type: application/json
+
+{
+    "vectors": [0.3], 
+    "id": 3, 
+    "index_type": "HNSW"
+}
+
+### 插入向量-1
+POST http://localhost:8000/insert
+Content-Type: application/json
+
+{
+    "vectors": [0.9],
+    "id": 2, 
+    "index_type": "HNSW"
+}
+
+
+### 搜索向量-1
+POST http://localhost:8000/search
+Content-Type: application/json
+
+{
+    "vectors": [0.5], 
+    "k": 1, 
+    "index_type": "HNSW"
 }
