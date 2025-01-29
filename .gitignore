@@ -4,3 +4,5 @@ __pycache__
 .vscode/launch.json
 .vscode/settings.json
 wal.log
+.snapshots
+snapshots_max_log_id

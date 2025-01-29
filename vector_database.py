@@ -15,24 +15,27 @@ from constants import IndexType, Operation
 
 class VectorDatabase:
     def __init__(self, index_factory: IndexFactory, db_path: str, wal_path: str, 
-                        version: str):
+                        snapshot_folder_path: str, version: str):
         """
         初始化向量数据库
         :param index_factory: 索引工厂
         :param db_path: 数据库路径
         :param wal_path: WAL日志路径
+        :param snapshot_folder_path: 快照文件夹路径
         :param version: 版本号
         """
         self.scalar_storage = ScalarStorage(db_path)
         self.index_factory = index_factory
         self.version = version
         self.persistence = Persistence()
-        self.persistence.init(wal_path)
+        self.persistence.init(index_factory, wal_path, snapshot_folder_path)
 
     def reload_database(self) -> None:
         """重新加载数据库"""
         logger.info("Entering VectorDatabase::reload_database()")
-        
+
+        self.persistence.load_snapshot(self.scalar_storage)
+
         while True:
             # 读取下一条WAL日志
             result = self.persistence.read_next_wal_log()
@@ -193,3 +196,9 @@ class VectorDatabase:
                 raise ValueError(f"Unsupported index type: {index_type}")
 
         return results
+
+    def take_snapshot(self):
+        """
+        保存快照
+        """
+        self.persistence.take_snapshot(self.scalar_storage)

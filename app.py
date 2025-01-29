@@ -4,9 +4,10 @@ import numpy as np
 from fastapi import FastAPI, HTTPException
 
 
-from constants import IndexType, MetricType, DIM, NUM_DATA, BD_PATH, WAL_PATH, VERSION
+from constants import IndexType, MetricType, DIM, NUM_DATA, BD_PATH, WAL_PATH, \
+    VERSION, SNAPSHOT_FOLDER_PATH
 from schemas import SearchRequest, SearchResponse, InsertRequest, InsertResponse \
-    , UpsertRequest, UpsertResponse, QueryRequest, QueryResponse
+    , UpsertRequest, UpsertResponse, QueryRequest, QueryResponse, SnapshotResponse
 from indexes.index_factory import IndexFactory
 from vector_database import VectorDatabase
 
@@ -22,7 +23,8 @@ index_factory.init(IndexType.HNSW, DIM, NUM_DATA)
 index_factory.init(IndexType.FILTER)
 
 # 初始化数据库和WAL日志
-vector_database = VectorDatabase(index_factory, BD_PATH, WAL_PATH, VERSION)
+vector_database = VectorDatabase(index_factory, BD_PATH, WAL_PATH, 
+                                    SNAPSHOT_FOLDER_PATH, VERSION)
 vector_database.reload_database()
 
 """
@@ -118,3 +120,14 @@ async def query(request: QueryRequest):
 
     except Exception as e:
         return QueryResponse(retcode=1, error_msg=str(e))
+
+
+@app.post("/admin/snapshot", response_model=SnapshotResponse)
+async def take_snapshot():
+    """创建数据库快照"""
+    try:
+        vector_database.take_snapshot()
+        return SnapshotResponse()
+    except Exception as e:
+        print(traceback.format_exc())
+        return SnapshotResponse(retcode=1, error_msg=str(e))

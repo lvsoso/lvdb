@@ -52,3 +52,27 @@ class ScalarStorage:
         except Exception as e:
             logging.error(f"Failed to get scalar: {str(e)}")
             return {}
+
+    def put(self, key: str, value: str) -> None:
+        """
+        存储键值对
+        :param key: 键
+        :param value: 值
+        """
+        try:
+            self.db[key.encode('utf-8')] = value.encode('utf-8')
+        except Exception as e:
+            logging.error(f"Failed to put key-value pair: {str(e)}")
+
+    def get(self, key: str) -> str:
+        """
+        获取键对应的值
+        :param key: 键
+        :return: 值，如果不存在则返回空字符串
+        """
+        try:
+            value = self.db.get(key.encode('utf-8'))
+            return value.decode('utf-8') if value is not None else ""
+        except Exception as e:
+            logging.error(f"Failed to get value for key {key}: {str(e)}")
+            return ""

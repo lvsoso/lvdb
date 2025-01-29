@@ -56,3 +56,9 @@ class QueryResponse(BaseModel):
     data: dict = {}
     retcode: int = 0
     error_msg: str = ""
+
+
+class SnapshotResponse(BaseModel):
+    """快照响应"""
+    retcode: int = 0
+    error_msg: str = ""

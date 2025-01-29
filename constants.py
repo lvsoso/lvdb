@@ -4,6 +4,8 @@ from enum import Enum
 VERSION = "1.0"
 BD_PATH = ".lvdb"
 WAL_PATH = "wal.log"
+SNAPSHOT_FOLDER_PATH = ".snapshots"
+SNAPSHOTS_MAX_LOG_ID = "snapshots_max_log_id"
 
 
 DIM = 1

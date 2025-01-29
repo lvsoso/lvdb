@@ -1,3 +1,4 @@
+import os
 import logging as logger
 import numpy as np
 import hnswlib
@@ -76,3 +77,33 @@ class HNSWIndex:
         labels, distances = self.index.knn_query(query, k=k, num_threads=1, filter=id_filter)
 
         return labels[0].tolist(), distances[0].tolist()
+
+    def save_index(self, file_path: str) -> None:
+        """
+        保存索引到文件
+        :param file_path: 保存路径
+        """
+        try:
+            self.index.save_index(file_path)
+            logger.info(f"Successfully saved index to {file_path}")
+        except Exception as e:
+            logger.error(f"Failed to save index: {str(e)}")
+            raise
+
+    def load_index(self, file_path: str) -> None:
+        """
+        从文件加载索引
+        :param file_path: 索引文件路径
+        """
+        try:
+            if os.path.exists(file_path):
+                self.index.load_index(
+                    file_path,
+                    max_elements=self.index.max_elements
+                )
+                logger.info(f"Successfully loaded index from {file_path}")
+            else:
+                logger.warning(f"File not found: {file_path}. Skipping loading index.")
+        except Exception as e:
+            logger.error(f"Failed to load index: {str(e)}")
+            raise

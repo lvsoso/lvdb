@@ -1,4 +1,5 @@
-import logging
+import base64
+import logging as logger
 from typing import Dict, Optional
 from pyroaring import BitMap
 from collections import defaultdict
@@ -11,7 +12,6 @@ class FilterIndex:
         """初始化过滤器索引"""
         # 使用嵌套的字典存储字段->值->位图的映射
         self.int_field_filter: Dict[str, Dict[int, BitMap]] = defaultdict(dict)
-        self.logger = logging.getLogger(__name__)
 
     def add_int_field_filter(self, fieldname: str, value: int, id: int) -> None:
         """
@@ -24,7 +24,7 @@ class FilterIndex:
             self.int_field_filter[fieldname][value] = BitMap()
         self.int_field_filter[fieldname][value].add(id)
         
-        self.logger.debug(
+        logger.debug(
             f"Added int field filter: fieldname={fieldname}, value={value}, id={id}"
         )
 
@@ -43,12 +43,12 @@ class FilterIndex:
         :param id: 文档ID
         """
         if old_value is not None:
-            self.logger.debug(
+            logger.debug(
                 f"Updated int field filter: field_name={field_name}, "
                 f"old_value={old_value}, new_value={new_value}, id={id}"
             )
         else:
-            self.logger.debug(
+            logger.debug(
                 f"Updated int field filter: field_name={field_name}, "
                 f"old_value=None, new_value={new_value}, id={id}"
             )
@@ -94,7 +94,7 @@ class FilterIndex:
             if op == Operation.EQUAL:
                 if value in value_map:
                     result_bitmap |= value_map[value]
-                    self.logger.debug(
+                    logger.debug(
                         f"Retrieved EQUAL bitmap for field_name={field_name}, value={value}"
                     )
             
@@ -102,8 +102,74 @@ class FilterIndex:
                 for val, bitmap in value_map.items():
                     if val != value:
                         result_bitmap |= bitmap
-                self.logger.debug(
+                logger.debug(
                     f"Retrieved NOT_EQUAL bitmap for field_name={field_name}, value={value}"
                 )
 
         return result_bitmap
+
+    def serialize_int_field_filter(self) -> str:
+        """
+        序列化整数字段过滤器
+        :return: 序列化后的字符串
+        """
+        serialized_data = []
+        
+        for field_name, value_map in self.int_field_filter.items():
+            for value, bitmap in value_map.items():
+                bitmap_bytes = bitmap.serialize()
+                bitmap_str = base64.b64encode(bitmap_bytes).decode('utf-8')
+                line = f"{field_name}|{value}|{bitmap_str}"
+                serialized_data.append(line)        
+        return "\n".join(serialized_data)
+
+    def deserialize_int_field_filter(self, serialized_data: str) -> None:
+        """
+        反序列化整数字段过滤器
+        :param serialized_data: 序列化的字符串数据
+        """
+        if not serialized_data:
+            return
+
+        self.int_field_filter.clear()
+
+        for line in serialized_data.split('\n'):
+            if not line:
+                continue
+
+            field_name, value_str, bitmap_str = line.split('|')
+            value = int(value_str)
+            bitmap_bytes = base64.b64decode(bitmap_str)
+            bitmap = BitMap.deserialize(bitmap_bytes)
+            self.int_field_filter[field_name][value] = bitmap
+
+    def save_index(self, scalar_storage, key: str) -> None:
+        """
+        保存索引到标量存储
+        :param scalar_storage: 标量存储对象
+        :param key: 存储键
+        """
+        try:
+            serialized_data = self.serialize_int_field_filter()
+            scalar_storage.put(key, serialized_data)
+            logger.debug(f"Successfully saved filter index with key: {key}")
+        except Exception as e:
+            logger.error(f"Failed to save filter index: {str(e)}")
+            raise
+
+    def load_index(self, scalar_storage, key: str) -> None:
+        """
+        从标量存储加载索引
+        :param scalar_storage: 标量存储对象
+        :param key: 存储键
+        """
+        try:
+            serialized_data = scalar_storage.get(key)
+            if serialized_data:
+                self.deserialize_int_field_filter(serialized_data)
+                logger.debug(f"Successfully loaded filter index with key: {key}")
+            else:
+                logger.warning(f"No data found for key: {key}")
+        except Exception as e:
+            logger.error(f"Failed to load filter index: {str(e)}")
+            raise

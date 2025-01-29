@@ -1,3 +1,6 @@
+import os
+import pickle
+import logging as logger
 import faiss
 import numpy as np
 from constants import MetricType
@@ -99,3 +102,39 @@ class FaissIndex:
         if internal_ids:
             selector = faiss.IDSelectorBatch(len(internal_ids), np.array(internal_ids, dtype='int64'))
             self.index.remove_ids(selector)
+
+    def save_index(self, file_path: str) -> None:
+        """
+        保存索引到文件
+        :param file_path: 保存路径
+        """
+        try:
+            faiss.write_index(self.index, file_path)
+            with open(f"{file_path}.map", "wb") as f:
+                pickle.dump({
+                    "id_map": self.id_map,
+                    "reverse_id_map": self.reverse_id_map
+                }, f)
+        except Exception as e:
+            logger.error(f"Failed to save index: {str(e)}")
+            raise
+
+    def load_index(self, file_path: str) -> None:
+        """
+        从文件加载索引
+        :param file_path: 索引文件路径
+        """
+        try:
+            if os.path.exists(file_path):
+                self.index = faiss.read_index(file_path)
+                if os.path.exists(f"{file_path}.map"):
+                    import pickle
+                    with open(f"{file_path}.map", "rb") as f:
+                        mapping = pickle.load(f)
+                        self.id_map = mapping["id_map"]
+                        self.reverse_id_map = mapping["reverse_id_map"]
+            else:
+                logger.warning(f"File not found: {file_path}. Skipping loading index.")
+        except Exception as e:
+            logger.error(f"Failed to load index: {str(e)}")
+            raise
