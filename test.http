@@ -1,0 +1,40 @@
+### 插入向量
+POST http://localhost:8000/insert
+Content-Type: application/json
+
+{
+    "vectors": [1.0], 
+    "id": 1, 
+    "index_type": "FLAT"
+}
+
+### 插入向量-1
+POST http://localhost:8000/insert
+Content-Type: application/json
+
+{
+    "vectors": [0.8],
+    "id": 2, 
+    "index_type": "FLAT"
+}
+
+
+### 搜索向量-1
+POST http://localhost:8000/search
+Content-Type: application/json
+
+{
+    "vectors": [1.0], 
+    "k": 5, 
+    "index_type": "FLAT"
+}
+
+### 搜索向量-2
+POST http://localhost:8000/search
+Content-Type: application/json
+
+{
+    "vectors": [0.5], 
+    "k": 5, 
+    "index_type": "FLAT"
+}
