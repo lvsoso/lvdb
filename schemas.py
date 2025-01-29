@@ -1,12 +1,19 @@
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Optional, Any, Literal
 from constants import IndexType
+
+
+class FilterCondition(BaseModel):
+    fieldName: str
+    op: Literal["=", "!=", ">", "<", ">=", "<="]
+    value: Any
 
 
 class SearchRequest(BaseModel):
     vectors: List[float]
     k: int
     index_type: str = IndexType.FLAT
+    filter: Optional[FilterCondition] = None
 
 
 class InsertRequest(BaseModel):

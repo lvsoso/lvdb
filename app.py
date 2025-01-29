@@ -1,3 +1,4 @@
+import logging as logger
 import numpy as np
 from fastapi import FastAPI, HTTPException
 
@@ -17,6 +18,7 @@ app = FastAPI(debug=True)
 index_factory = IndexFactory()
 index_factory.init(IndexType.FLAT, DIM)
 index_factory.init(IndexType.HNSW, DIM, NUM_DATA)
+index_factory.init(IndexType.FILTER)
 
 vector_database = VectorDatabase(index_factory, BD_PATH)
 
@@ -35,11 +37,13 @@ async def search(request: SearchRequest):
             case _:
                 raise HTTPException(status_code=400, detail="Invalid index type")
 
-        index = index_factory.get_index(index_type)
-        if not index:
-            raise HTTPException(status_code=400, detail="Index not initialized")
 
-        ids, distances = index.search_vectors(request.vectors, request.k)
+        ids, distances = vector_database.search(request)
+        # index = index_factory.get_index(index_type)
+        # if not index:
+        #     raise HTTPException(status_code=400, detail="Index not initialized")
+
+        # ids, distances = index.search_vectors(request.vectors, request.k)
         
         valid_results = [(i, d) for i, d in zip(ids, distances) if i != -1]
         if not valid_results:
@@ -49,6 +53,8 @@ async def search(request: SearchRequest):
         return SearchResponse(vectors=list(result_ids), distances=list(result_distances))
 
     except Exception as e:
+        import traceback
+        print(traceback.format_exc())
         return SearchResponse(retcode=1, error_msg=str(e))
 
 

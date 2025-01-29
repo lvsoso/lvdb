@@ -1,0 +1,113 @@
+## FLAT
+
+### upsert
+POST http://localhost:8000/upsert
+Content-Type: application/json
+
+{
+    "vectors": [0.9], 
+    "id": 7, 
+    "int_field": 47,
+    "index_type": "FLAT"
+}
+
+
+### search =
+POST http://localhost:8000/search
+Content-Type: application/json
+
+{
+    "vectors": [0.9], 
+    "k": 5, 
+    "index_type": "FLAT",
+    "filter": {
+        "fieldName": "int_field",
+        "op": "=",
+        "value": 47
+    }
+}
+
+### search !=
+POST http://localhost:8000/search
+Content-Type: application/json
+
+{
+    "vectors": [0.9], 
+    "k": 5, 
+    "index_type": "FLAT",
+    "filter": {
+        "fieldName": "int_field",
+        "op": "!=",
+        "value": 47
+    }
+}
+
+
+## HNSW
+
+### upsert
+POST http://localhost:8000/upsert
+Content-Type: application/json
+
+{
+    "vectors": [0.9], 
+    "id": 10, 
+    "int_field": 60,
+    "index_type": "HNSW"
+}
+
+### upsert -1
+
+POST http://localhost:8000/upsert
+Content-Type: application/json
+
+{
+    "vectors": [0.7], 
+    "id": 14, 
+    "int_field": 60,
+    "index_type": "HNSW"
+}
+
+
+### upsert -2
+
+POST http://localhost:8000/upsert
+Content-Type: application/json
+
+{
+    "vectors": [0.8], 
+    "id": 16, 
+    "int_field": 60,
+    "index_type": "HNSW"
+}
+
+
+### search =
+POST http://localhost:8000/search
+Content-Type: application/json
+
+{
+    "vectors": [0.9], 
+    "k": 1, 
+    "index_type": "HNSW",
+    "filter": {
+        "fieldName": "int_field",
+        "op": "=",
+        "value": 60
+    }
+}
+
+### search !=
+POST http://localhost:8000/search
+Content-Type: application/json
+
+{
+    "vectors": [0.9], 
+    "k": 3, 
+    "index_type": "HNSW",
+    "filter": {
+        "fieldName": "int_field",
+        "op": "!=",
+        "value": 60
+    }
+}

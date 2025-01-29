@@ -1,11 +1,16 @@
+import logging as logger
 from enum import Enum
 import numpy as np
 from typing import Dict, Any, List
+
 from scalar_storage import ScalarStorage
-from constants import IndexType
 from indexes.index_factory import IndexFactory
 from indexes.faiss_index import FaissIndex
 from indexes.hnsw_index import HNSWIndex
+
+from schemas import SearchRequest
+from constants import IndexType, Operation
+
 
 class VectorDatabase:
     def __init__(self, index_factory: IndexFactory, db_path: str):
@@ -48,6 +53,27 @@ class VectorDatabase:
         index = self.index_factory.get_index(index_type)
         # TODO: 检查index是否为空
         index.insert_vectors(new_vector, id)
+
+        # 支持过滤索引
+        filter_index = self.index_factory.get_index(IndexType.FILTER)
+        if filter_index:
+            for field_name, value in data.items():
+                if isinstance(value, int) and field_name != "id":
+
+                    # 获取旧值（如果存在）
+                    old_value = None
+                    if existing_data and field_name in existing_data:
+                        old_value = existing_data[field_name]
+
+                    # 更新过滤器
+                    filter_index.update_int_field_filter(
+                        field_name=field_name,
+                        old_value=old_value,
+                        new_value=value,
+                        id=id
+                    )
+                    logger.error(f"id: {id}, field_name: {field_name}, value : {value}")
+    
         # 更新标量存储
         self.scalar_storage.insert_scalar(id, data)
 
@@ -58,3 +84,58 @@ class VectorDatabase:
         :return: 向量数据字典
         """
         return self.scalar_storage.get_scalar(id)
+
+    def search(self, json_request: SearchRequest) -> tuple[list[int], list[float]]:
+        """
+        搜索向量
+        :param json_request: 包含搜索参数的字典
+        :return: (ids, distances) 元组
+        """
+        # 从请求中获取查询参数
+        query = np.array(json_request.vectors, dtype=np.float32)
+        k = json_request.k
+
+        # 获取索引类型
+        index_type = IndexType.UNKNOWN
+        if json_request.index_type:
+            index_type_str = json_request.index_type
+            if index_type_str == IndexType.FLAT.value:
+                index_type = IndexType.FLAT
+            elif index_type_str == IndexType.HNSW.value:
+                index_type = IndexType.HNSW
+
+        # 处理过滤条件
+        filter_bitmap = None
+        if json_request.filter:
+            filter_data = json_request.filter
+            field_name = filter_data.fieldName
+            op_str = filter_data.op
+            value = filter_data.value
+
+            # 转换操作符
+            op = Operation.EQUAL if op_str == "=" else Operation.NOT_EQUAL
+
+            logger.error(f"op: {op}, field_name: {field_name}, value : {value}")
+
+            # 获取过滤索引并创建位图
+            filter_index = self.index_factory.get_index(IndexType.FILTER)
+            if filter_index:
+                filter_bitmap = filter_index.get_int_field_filter_bitmap(
+                    field_name, op, value
+                )
+
+        # 获取向量索引
+        index = self.index_factory.get_index(index_type)
+        if not index:
+            raise ValueError(f"Index type {index_type} not initialized")
+
+        # 执行搜索
+        match index_type:
+            case IndexType.FLAT:
+                results = index.search_vectors(query, k, filter_bitmap)
+            case IndexType.HNSW:
+                results = index.search_vectors(query, k, filter_bitmap)
+            case _:
+                raise ValueError(f"Unsupported index type: {index_type}")
+
+        return results

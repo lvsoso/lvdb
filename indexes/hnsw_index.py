@@ -1,10 +1,30 @@
+import logging as logger
 import numpy as np
 import hnswlib
+from typing import Optional, Set
+
 from constants import MetricType
+
+
+
+class RoaringBitmapIDFilter:
+    def __init__(self, bitmap: Optional[Set[int]] = None):
+        self.bitmap = bitmap if bitmap is not None else set()
+
+    def __call__(self, label: int) -> bool:
+        """
+        检查标签是否在位图中
+        :param label: 要检查的标签
+        :return: 如果bitmap为空返回True，否则检查标签是否在bitmap中
+        """
+        if not self.bitmap:
+            return True
+        return label in self.bitmap
+
 
 class HNSWIndex:
 
-    def __init__(self, dim: int, num_data: int, metric: MetricType, M: int = 16, ef_construction: int = 200):
+    def __init__(self, dim: int, num_data: int, metric: MetricType, M: int = 32, ef_construction: int = 200):
         """
         初始化 HNSW 索引
         :param dim: 向量维度
@@ -37,17 +57,22 @@ class HNSWIndex:
         labels = np.array([label])
         self.index.add_items(vector, labels)
 
-    def search_vectors(self, query: list, k: int, ef_search: int = 50):
+    def search_vectors(self, query: list, k: int, bitmap=None, ef_search: int = 50):
         """
         查询向量
         :param query: 查询向量，一维列表
         :param k: 返回最近邻的数量
+        :param bitmap: 可选的位图过滤器
         :param ef_search: 搜索时的搜索深度
         :return: (labels, distances) 元组，包含最近邻的标签和距离
         """
         query = np.array(query).reshape(1, -1).astype('float32')
-        # 设置 ef_search 参数
         self.index.set_ef(ef_search)
-        # 执行搜索
-        labels, distances = self.index.knn_query(query, k=k)
+
+        # 创建过滤器
+        id_filter = RoaringBitmapIDFilter(bitmap)
+        
+        # 执行搜索，获取更多的候选项以应对过滤
+        labels, distances = self.index.knn_query(query, k=k, num_threads=1, filter=id_filter)
+
         return labels[0].tolist(), distances[0].tolist()

@@ -3,6 +3,14 @@ import numpy as np
 from constants import MetricType
 
 
+class RoaringBitmapIDSelector:
+    def __init__(self, bitmap):
+        self.bitmap = bitmap
+
+    def is_member(self, id: int) -> bool:
+        return id in self.bitmap if self.bitmap else True
+
+
 class FaissIndex:
 
     def __init__(self, dim: int, metric_type: MetricType = MetricType.L2):
@@ -20,11 +28,56 @@ class FaissIndex:
         self.id_map[internal_id] = label
         self.reverse_id_map[label] = internal_id
 
-    def search_vectors(self, query: list, k: int):
+    def search_vectors_(self, query: list, k: int, bitmap=None) -> tuple[list[int], list[float]]:
+        """
+        搜索向量
+        :param query: 查询向量
+        :param k: 返回的最近邻数量
+        :param bitmap: 可选的位图过滤器
+        :return: (ids, distances) 元组
+        """
         query = np.array(query).reshape(1, -1).astype('float32')
-        distances, indices = self.index.search(query, k)
+        
+        # 创建搜索参数
+        params = None
+        if bitmap is not None:
+            logger.error(" bitmap ")
+            selector = RoaringBitmapIDSelector(bitmap)
+            params = faiss.SearchParameters(sel = selector)
+
+        distances, indices = self.index.search(query, k, params=params)
+
         result_ids = [self.id_map.get(idx, -1) for idx in indices[0]]
         return result_ids, distances[0].tolist()
+
+    def search_vectors(self, query: list, k: int, bitmap=None) -> tuple[list[int], list[float]]:
+        """
+        搜索向量
+        :param query: 查询向量
+        :param k: 返回的最近邻数量
+        :param bitmap: 可选的位图过滤器
+        :return: (ids, distances) 元组
+        """
+        query = np.array(query).reshape(1, -1).astype('float32')
+        
+        # 如果有位图过滤器，获取更多候选项以应对过滤
+        search_k = k * 2 if bitmap is not None else k
+        distances, indices = self.index.search(query, search_k)
+
+        # 应用过滤器
+        filtered_results = []
+        for idx, dist in zip(indices[0], distances[0]):
+            label = self.id_map.get(idx, None)
+            if label and (bitmap is None or label in bitmap):
+                filtered_results.append((label, dist))
+                if len(filtered_results) >= k:
+                    break
+
+        while len(filtered_results) < k:
+            filtered_results.append((-1, 0))
+
+        result_ids, distances = zip(*filtered_results)
+        return list(result_ids), list(distances)
 
     def remove_vectors(self, ids: list):
         """
