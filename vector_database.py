@@ -3,6 +3,7 @@ from enum import Enum
 import numpy as np
 from typing import Dict, Any, List
 
+from persistence import Persistence
 from scalar_storage import ScalarStorage
 from indexes.index_factory import IndexFactory
 from indexes.faiss_index import FaissIndex
@@ -13,14 +14,67 @@ from constants import IndexType, Operation
 
 
 class VectorDatabase:
-    def __init__(self, index_factory: IndexFactory, db_path: str):
+    def __init__(self, index_factory: IndexFactory, db_path: str, wal_path: str, 
+                        version: str):
         """
         初始化向量数据库
         :param index_factory: 索引工厂
         :param db_path: 数据库路径
+        :param wal_path: WAL日志路径
+        :param version: 版本号
         """
         self.scalar_storage = ScalarStorage(db_path)
         self.index_factory = index_factory
+        self.version = version
+        self.persistence = Persistence()
+        self.persistence.init(wal_path)
+
+    def reload_database(self) -> None:
+        """重新加载数据库"""
+        logger.info("Entering VectorDatabase::reload_database()")
+        
+        while True:
+            # 读取下一条WAL日志
+            result = self.persistence.read_next_wal_log()
+            if result is None:
+                break
+                
+            operation_type, json_data = result
+            logger.info(f"Operation Type: {operation_type}")
+            logger.info(f"Read Line: {json_data}")
+
+            if operation_type == "upsert":
+                try:
+                    id = json_data["id"]
+                    index_type = self._get_index_type_from_request(json_data)
+                    
+                    # 调用upsert接口重建数据
+                    self.upsert(id, json_data, index_type)
+                except Exception as e:
+                    logger.error(f"Error processing WAL log entry: {str(e)}")
+                    continue
+
+    def write_wal_log(self, operation_type: str, json_data: Dict[str, Any]) -> None:
+        """
+        写入WAL日志
+        :param operation_type: 操作类型
+        :param json_data: JSON数据
+        """
+        self.persistence.write_wal_log(operation_type, json_data, self.version)
+
+    def _get_index_type_from_request(self, json_request: Dict[str, Any]) -> IndexType:
+        """
+        从请求中获取索引类型
+        :param json_request: 请求数据
+        :return: 索引类型
+        """
+        if "index_type" in json_request:
+            index_type_str = json_request["index_type"]
+            if index_type_str == IndexType.FLAT.value:
+                return IndexType.FLAT
+            elif index_type_str == IndexType.HNSW.value:
+                return IndexType.HNSW
+        return IndexType.UNKNOWN
 
     def upsert(self, id: int, data: Dict[str, Any], index_type: IndexType) -> None:
         """

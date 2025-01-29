@@ -1,9 +1,10 @@
 import logging as logger
+import traceback
 import numpy as np
 from fastapi import FastAPI, HTTPException
 
 
-from constants import IndexType, MetricType, DIM, NUM_DATA, BD_PATH
+from constants import IndexType, MetricType, DIM, NUM_DATA, BD_PATH, WAL_PATH, VERSION
 from schemas import SearchRequest, SearchResponse, InsertRequest, InsertResponse \
     , UpsertRequest, UpsertResponse, QueryRequest, QueryResponse
 from indexes.index_factory import IndexFactory
@@ -20,7 +21,9 @@ index_factory.init(IndexType.FLAT, DIM)
 index_factory.init(IndexType.HNSW, DIM, NUM_DATA)
 index_factory.init(IndexType.FILTER)
 
-vector_database = VectorDatabase(index_factory, BD_PATH)
+# 初始化数据库和WAL日志
+vector_database = VectorDatabase(index_factory, BD_PATH, WAL_PATH, VERSION)
+vector_database.reload_database()
 
 """
 注册接口
@@ -53,7 +56,6 @@ async def search(request: SearchRequest):
         return SearchResponse(vectors=list(result_ids), distances=list(result_distances))
 
     except Exception as e:
-        import traceback
         print(traceback.format_exc())
         return SearchResponse(retcode=1, error_msg=str(e))
 
@@ -93,11 +95,13 @@ async def upsert(request: UpsertRequest):
             case _:
                 raise HTTPException(status_code=400, detail="Invalid index type")
 
+        vector_database.write_wal_log("upsert", request.dict())
         # 执行更新插入
         vector_database.upsert(request.id, request.dict(), index_type)
         return UpsertResponse()
 
     except Exception as e:
+        print(traceback.format_exc())
         return UpsertResponse(retcode=1, error_msg=str(e))
 
 

@@ -1,7 +1,11 @@
 from enum import Enum
 
 
-BD_PATH = '.lvdb'
+VERSION = "1.0"
+BD_PATH = ".lvdb"
+WAL_PATH = "wal.log"
+
+
 DIM = 1
 NUM_DATA = 1000
 

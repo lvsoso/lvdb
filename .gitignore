@@ -1,12 +1,6 @@
 .venv
 __pycache__
-.lvdb/000004.log
-.lvdb/CURRENT
-.lvdb/IDENTITY
-.lvdb/LOCK
-.lvdb/LOG
-.lvdb/MANIFEST-000005
-.lvdb/OPTIONS-000007
-.lvdb/rocksdict-config.json
+.lvdb
 .vscode/launch.json
 .vscode/settings.json
+wal.log
