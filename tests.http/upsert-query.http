@@ -1,0 +1,19 @@
+### upsert
+POST http://localhost:8000/upsert
+Content-Type: application/json
+
+{
+    "vectors": [1.0], 
+    "id": 1, 
+    "index_type": "FLAT",
+    "Name": "hello",
+    "Ci": "1111"
+}
+
+### query
+POST http://localhost:8000/query
+Content-Type: application/json
+
+{
+    "id": 1
+}

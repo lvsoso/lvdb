@@ -1,11 +1,11 @@
 ### 开发
 
 ```shell
-pip install mypy
-pip install pydantic[mypy]
-pip install fastapi
-pip install "uvicorn[standard]"
-pip install python-multipart
-pip install pydantic-settings
-```
+HOMEBREW_NO_AUTO_UPDATE=1 brew install rocksdb
 
+uv venv
+
+source .venv/bin/activate
+
+python main.py
+```

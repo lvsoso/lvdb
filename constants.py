@@ -1,5 +1,7 @@
 from enum import Enum
 
+
+BD_PATH = '.lvdb'
 DIM = 1
 NUM_DATA = 1000
 

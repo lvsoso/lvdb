@@ -25,3 +25,27 @@ class SearchResponse(BaseModel):
 class InsertResponse(BaseModel):
     retcode: int = 0
     error_msg: Optional[str] = None
+
+
+class UpsertRequest(BaseModel):
+    vectors: List[float]
+    id: int
+    index_type: str
+
+    class Config:
+        extra = "allow"
+
+
+class UpsertResponse(BaseModel):
+    retcode: int = 0
+    error_msg: str = ""
+
+
+class QueryRequest(BaseModel):
+    id: int
+
+
+class QueryResponse(BaseModel):
+    data: dict = {}
+    retcode: int = 0
+    error_msg: str = ""
