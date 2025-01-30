@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>上传Markdown文件</title>
+</head>
+<body>
+    <h1>上传Markdown文件</h1>
+    <form id="upload-form" action="/upload" method="post" enctype="multipart/form-data">
+        <input type="file" name="file" required>
+        <button type="submit">上传</button>
+    </form>
+    <div id="results"></div>
+
+    <!-- 添加用户查询表单 -->
+    <form id="search-form">
+        <input type="text" name="search" placeholder="输入问题">
+        <button type="submit">查询</button>
+    </form>
+
+    <!-- 显示查询结果 -->
+    <div id="search-results"></div>
+
+    <script src="static/script.js"></script>
+</body>
+</html>
