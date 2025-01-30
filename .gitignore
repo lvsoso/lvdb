@@ -6,3 +6,4 @@ __pycache__
 wal.log
 .snapshots
 snapshots_max_log_id
+demo/image-search/static/images

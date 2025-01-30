@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Image Upload and Preview</title>
+    <style>
+        #searchResults {
+            display: flex;
+            flex-wrap: nowrap;
+            overflow-x: auto;
+        }
+        .image-container {
+            margin-right: 10px; /* 为图片之间添加一些空间 */
+        }
+        .image-container img {
+            max-width: 500px;
+            max-height: 500px;
+            display: block;
+        }
+        .image-container p {
+            text-align: center;
+        }
+    </style>    
+</head>
+<body>
+    <h1>Upload Image</h1>
+    <form id="uploadForm" enctype="multipart/form-data">
+        <input type="text" name="image_id" placeholder="Image ID" required />
+        <input type="file" name="image" required onchange="previewImage(event)" />
+        <button type="submit">Upload</button>
+    </form>
+
+    <h1>Search Image</h1>
+    <form id="searchForm" enctype="multipart/form-data">
+        <input type="file" name="image" required onchange="previewImage(event)" />
+        <button type="submit">Search</button>
+    </form>
+
+    <h2>Preview</h2>
+    <img id="imagePreview" style="max-width: 500px; max-height: 500px;" />
+
+    <h2>Search Results</h2>
+    <div id="searchResults"></div>
+
+    <script src="static/script.js"></script> <!-- 引用外部 JavaScript 文件 -->
+</body>
+</html>
