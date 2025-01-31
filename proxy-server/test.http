@@ -1,0 +1,29 @@
+### 查看拓扑结构
+GET http://localhost:9090/topology
+
+### 读请求
+POST http://localhost:9090/search
+Content-Type: application/application/json
+
+{
+    "vectors": [0.9], 
+    "k": 5, 
+    "index_type": "FLAT",
+    "filter": {
+        "fieldName": "int_field",
+        "op": "=",
+        "value": 33
+    }
+}
+
+
+### 写请求
+POST http://localhost:9090/upsert
+Content-Type: application/json
+
+{
+    "id": 1, 
+    "vectors": [0.9],
+    "int_field": 33,
+    "index_type": "FLAT"
+}
