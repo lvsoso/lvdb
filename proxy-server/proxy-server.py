@@ -38,6 +38,29 @@ class ProxyServer:
         self.setup_routes()
         self.start_update_thread()
 
+        # 添加读写路径定义
+        self.write_paths = {"/upsert"}
+        self.read_paths = {"/search"}
+
+    def get_target_node(self, path: str, force_master: bool = False) -> NodeInfo:
+        """根据请求路径和参数选择目标节点"""
+        with self.nodes_lock:
+            if not self.nodes:
+                raise HTTPException(status_code=503, detail="No available nodes")
+
+            # 写请求或强制主节点请求需要路由到主节点
+            if force_master or path in self.write_paths:
+                master_nodes = [node for node in self.nodes if node.role == ServerRole.MASTER]
+                if not master_nodes:
+                    raise HTTPException(status_code=503, detail="No master node available")
+                logger.info(f"Routing {'write' if path in self.write_paths else 'forced'} request to master node")
+                return master_nodes[0]
+            else:
+                # 读请求 - 轮询所有节点
+                node = self.nodes[self.next_node_index % len(self.nodes)]
+                self.next_node_index += 1
+                logger.info(f"Routing read request to node: {node.nodeId}")
+                return node
 
     def setup_routes(self):
         @self.app.get("/topology")
@@ -54,35 +77,42 @@ class ProxyServer:
                     } for node in self.nodes
                 ]
             }
-            
+
         @self.app.api_route("/{path:path}", methods=["GET", "POST"])
         async def forward_request(path: str, request: Request):
             if not self.nodes:
                 raise HTTPException(status_code=503, detail="No available nodes")
 
-            with self.nodes_lock:
-                node = self.nodes[self.next_node_index % len(self.nodes)]
-                self.next_node_index += 1
-
-            target_url = f"{node.url}/{path}"
-            method = request.method
-            
             try:
-                body = await request.body()
+                force_master = request.query_params.get("forceMaster", "").lower() == "true"
+                node = self.get_target_node(path, force_master)
                 
+                target_url = f"{node.url}/{path}"
+                method = request.method
+                body = await request.body()
+                params = dict(request.query_params)
+                params.pop("forceMaster", None)
+                
+                # 记录转发信息
+                logger.info(f"Forwarding {method} request to {node.role.name} node {node.nodeId} "
+                        f"(URL: {target_url}, forceMaster={force_master})")
+                
+                # 发送请求
                 response = requests.request(
                     method=method,
                     url=target_url,
-                    json=json.loads(body.decode('utf-8')),
+                    params=params,
+                    json=json.loads(body.decode('utf-8')) if body else None,
                     timeout=30
                 )
                 
                 return response.json()
-            except Exception as e:
-                logger.error(traceback.format_exc())
-                logger.error(f"Error forwarding request: {str(e)}")
-                raise HTTPException(status_code=500, detail="Internal Server Error")
 
+            except HTTPException:
+                raise
+            except Exception as e:
+                logger.error(f"Error forwarding request: {str(e)}\n{traceback.format_exc()}")
+                raise HTTPException(status_code=500, detail="Internal Server Error")
 
     def fetch_and_update_nodes(self):
         try:
