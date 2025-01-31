@@ -30,7 +30,9 @@ class ProxyServer:
         self.master_host = master_host
         self.master_port = master_port
         self.instance_id = instance_id
-        self.nodes: List[NodeInfo] = []
+
+        self.nodes_buffers = [[], []]
+        self.active_index = 0
         self.next_node_index = 0
         self.nodes_lock = threading.Lock()
         self.running = True
@@ -42,29 +44,37 @@ class ProxyServer:
         self.write_paths = {"/upsert"}
         self.read_paths = {"/search"}
 
+    @property
+    def active_nodes(self) -> List[NodeInfo]:
+        """获取当前活动的节点列表"""
+        return self.nodes_buffers[self.active_index]
+
     def get_target_node(self, path: str, force_master: bool = False) -> NodeInfo:
         """根据请求路径和参数选择目标节点"""
-        with self.nodes_lock:
-            if not self.nodes:
-                raise HTTPException(status_code=503, detail="No available nodes")
+        nodes = self.active_nodes
+        if not nodes:
+            raise HTTPException(status_code=503, detail="No available nodes")
 
-            # 写请求或强制主节点请求需要路由到主节点
-            if force_master or path in self.write_paths:
-                master_nodes = [node for node in self.nodes if node.role == ServerRole.MASTER]
-                if not master_nodes:
-                    raise HTTPException(status_code=503, detail="No master node available")
-                logger.info(f"Routing {'write' if path in self.write_paths else 'forced'} request to master node")
-                return master_nodes[0]
-            else:
-                # 读请求 - 轮询所有节点
-                node = self.nodes[self.next_node_index % len(self.nodes)]
-                self.next_node_index += 1
-                logger.info(f"Routing read request to node: {node.nodeId}")
-                return node
+        # 写请求或强制主节点请求需要路由到主节点
+        if force_master or path in self.write_paths:
+            master_nodes = [node for node in nodes if node.role == ServerRole.MASTER]
+            if not master_nodes:
+                raise HTTPException(status_code=503, detail="No master node available")
+            logger.info(f"Routing {'write' if path in self.write_paths else 'forced'} request to master node")
+            return master_nodes[0]
+        else:
+            # 读请求 - 轮询所有节点
+            node = nodes[self.next_node_index % len(nodes)]
+            self.next_node_index += 1
+            logger.info(f"Routing read request to node: {node.nodeId}")
+            return node
+
 
     def setup_routes(self):
         @self.app.get("/topology")
         def get_topology():
+            """返回当前系统拓扑信息"""
+            nodes = self.active_nodes
             return {
                 "masterServer": self.master_host,
                 "masterServerPort": self.master_port,
@@ -73,16 +83,13 @@ class ProxyServer:
                     {
                         "nodeId": node.nodeId,
                         "url": node.url,
-                        "role": node.role
-                    } for node in self.nodes
+                        "role": int(node.role)  # 确保role以整数形式返回
+                    } for node in nodes
                 ]
             }
 
         @self.app.api_route("/{path:path}", methods=["GET", "POST"])
         async def forward_request(path: str, request: Request):
-            if not self.nodes:
-                raise HTTPException(status_code=503, detail="No available nodes")
-
             try:
                 force_master = request.query_params.get("forceMaster", "").lower() == "true"
                 node = self.get_target_node(path, force_master)
@@ -115,6 +122,7 @@ class ProxyServer:
                 raise HTTPException(status_code=500, detail="Internal Server Error")
 
     def fetch_and_update_nodes(self):
+        """获取并更新节点信息，使用双缓冲区"""
         try:
             url = f"http://{self.master_host}:{self.master_port}/getInstance"
             params = {"instanceId": self.instance_id}
@@ -126,21 +134,30 @@ class ProxyServer:
                 logger.error(f"Error from Master Server: {data['msg']}")
                 return
 
+            inactive_index = 1 - self.active_index
             new_nodes = []
+            
+            # 只添加状态正常的节点
             for node_data in data["data"]["nodes"]:
-                node = NodeInfo(
-                    nodeId=node_data["nodeId"],
-                    url=node_data["url"],
-                    role=node_data["role"]
-                )
-                new_nodes.append(node)
+                if node_data.get("status", 0) == 1:  # 只添加状态为1的节点
+                    try:
+                        node = NodeInfo(
+                            nodeId=node_data["nodeId"],
+                            url=node_data["url"],
+                            role=ServerRole(node_data["role"])
+                        )
+                        new_nodes.append(node)
+                    except Exception as e:
+                        logger.warning(f"Failed to parse node data: {str(e)}")
+                else:
+                    logger.info(f"Skipping inactive node: {node_data.get('nodeId', 'unknown')}")
 
-            with self.nodes_lock:
-                self.nodes = new_nodes
-            logger.info("Nodes updated successfully")
+            self.nodes_buffers[inactive_index] = new_nodes            
+            self.active_index = inactive_index
+            logger.info(f"Nodes updated successfully, active nodes: {len(new_nodes)}")
 
         except Exception as e:
-            logger.error(f"Error fetching nodes: {str(e)}")
+            logger.error(f"Error fetching nodes: {str(e)}\n{traceback.format_exc()}")
 
     def update_nodes_loop(self):
         while self.running:
