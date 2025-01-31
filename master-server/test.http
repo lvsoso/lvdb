@@ -23,6 +23,41 @@ Content-Type: application/json
     "status": 1
 }
 
+
+### 更新分区信息
+POST http://localhost:8100/updatePartitionConfig
+Content-Type: application/json
+
+{
+    "instanceId": "instance1",
+    "partitionKey": "id",
+    "numberOfPartitions": 2,
+    "partitions": [
+        {"partitionId": 0, "nodeId": "node123"},
+        {"partitionId": 1, "nodeId": "node124"}
+    ]
+}
+
+### 获取分区信息
+GET http://localhost:8100/getPartitionConfig?instanceId=instance1
+
+
+
+### 更新分区信息：
+POST http://localhost:8100/updatePartitionConfig
+Content-Type: application/json
+
+{
+    "instanceId": "instance1",
+    "partitionKey": "id",
+    "numberOfPartitions": 1,
+    "partitions": [
+        {"partitionId": 0, "nodeId": "node123"},
+        {"partitionId": 0, "nodeId": "node124"}
+    ]
+}
+
+
 ### 查看instance下的所有node信息
 GET http://localhost:8100/getInstance?instanceId=instance1
 Content-Type: application/json

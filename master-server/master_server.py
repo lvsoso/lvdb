@@ -46,10 +46,29 @@ class NodeRequest(BaseModel):
     role: ServerRole
     status: int
 
+
 class ResponseModel(BaseModel):
     retCode: int
     msg: str
     data: Optional[Dict[str, Any]] = None
+
+
+class Partition(BaseModel):
+    partitionId: int
+    nodeId: str
+
+
+class PartitionConfig(BaseModel):
+    partitionKey: str
+    numberOfPartitions: int
+    partitions: List[Partition]
+
+
+class PartitionConfigRequest(BaseModel):
+    instanceId: str
+    partitionKey: str
+    numberOfPartitions: int
+    partitions: List[Partition]
 
 class MasterServer:
     def __init__(self, etcd_endpoints: str):
@@ -247,6 +266,80 @@ class MasterServer:
             except Exception as e:
                 logger.error(f"Error accessing etcd: {str(e)}")
                 raise HTTPException(status_code=500, detail=str(e))
+
+        @self.app.get("/getPartitionConfig", response_model=ResponseModel)
+        async def get_partition_config(instanceId: str):
+            try:
+                config = await self._do_get_partition_config(instanceId)
+                return ResponseModel(
+                    retCode=0,
+                    msg="Partition config retrieved successfully",
+                    data={
+                        "partitionKey": config.partitionKey,
+                        "numberOfPartitions": config.numberOfPartitions,
+                        "partitions": [partition.dict() for partition in config.partitions]
+                    }
+                )
+            except Exception as e:
+                logger.error(f"Error getting partition config: {str(e)}")
+                raise HTTPException(status_code=500, detail=str(e))
+
+        @self.app.post("/updatePartitionConfig", response_model=ResponseModel)
+        async def update_partition_config(request: PartitionConfigRequest):
+            try:
+                await self._do_update_partition_config(
+                    request.instanceId,
+                    request.partitionKey,
+                    request.numberOfPartitions,
+                    request.partitions
+                )
+                return ResponseModel(
+                    retCode=0,
+                    msg="Partition configuration updated successfully"
+                )
+            except Exception as e:
+                logger.error(f"Error updating partition config: {str(e)}")
+                raise HTTPException(status_code=500, detail=str(e))
+
+    async def _do_get_partition_config(self, instance_id: str) -> PartitionConfig:
+        """获取分区配置"""
+        etcd_key = f"/instancesConfig/{instance_id}/partitionConfig"
+        value, _ = self.etcd_client.get(etcd_key)
+        
+        if not value:
+            return PartitionConfig(
+                partitionKey="",
+                numberOfPartitions=0,
+                partitions=[]
+            )
+
+        config_dict = eval(value.decode('utf-8'))
+        return PartitionConfig(
+            partitionKey=config_dict.get("partitionKey", ""),
+            numberOfPartitions=config_dict.get("numberOfPartitions", 0),
+            partitions=[
+                Partition(**partition)
+                for partition in config_dict.get("partitions", [])
+            ]
+        )
+
+    async def _do_update_partition_config(
+        self,
+        instance_id: str,
+        partition_key: str,
+        number_of_partitions: int,
+        partitions: List[Partition]
+    ):
+        """更新分区配置"""
+        config = {
+            "partitionKey": partition_key,
+            "numberOfPartitions": number_of_partitions,
+            "partitions": [partition.dict() for partition in partitions]
+        }
+        
+        etcd_key = f"/instancesConfig/{instance_id}/partitionConfig"
+        self.etcd_client.put(etcd_key, str(config))
+        logger.info(f"Updated partition config for instance {instance_id}")
 
     def cleanup(self):
         """清理资源"""

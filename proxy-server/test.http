@@ -22,7 +22,7 @@ POST http://localhost:9090/upsert
 Content-Type: application/json
 
 {
-    "id": 1, 
+    "id": 4, 
     "vectors": [0.9],
     "int_field": 33,
     "index_type": "FLAT"
